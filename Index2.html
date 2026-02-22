@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>Fitness Assistant 2.0</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: #f4f6f9;
+}
+
+header {
+  background: linear-gradient(135deg,#4CAF50,#2E7D32);
+  color: white;
+  padding: 20px;
+  text-align: center;
+  font-size: 20px;
+}
+
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  background: white;
+  padding: 10px;
+}
+
+.tabs button {
+  border: none;
+  background: none;
+  font-size: 16px;
+}
+
+.section {
+  display: none;
+  padding: 20px;
+}
+
+.active {
+  display: block;
+}
+
+.card {
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+button.primary {
+  background: #4CAF50;
+  color: white;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  width: 100%;
+}
+</style>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBpKzrSWucpiyTUYsWmyfU_rSExBiXX7aE",
+  authDomain: "fitness-app-677a8.firebaseapp.com",
+  projectId: "fitness-app-677a8",
+  storageBucket: "fitness-app-677a8.firebasestorage.app",
+  messagingSenderId: "750130637655",
+  appId: "1:750130637655:web:5894baf79961940478ac12",
+  measurementId: "G-TSBN5MN7WV"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.showTab = function(tab) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.getElementById(tab).classList.add("active");
+}
+
+window.calculate = function() {
+  const weight = +document.getElementById("p_weight").value;
+  const height = +document.getElementById("p_height").value;
+  const age = +document.getElementById("p_age").value;
+  const gender = document.getElementById("p_gender").value;
+  const activity = +document.getElementById("p_activity").value;
+
+  let bmr = gender === "male"
+    ? 10*weight + 6.25*height - 5*age + 5
+    : 10*weight + 6.25*height - 5*age - 161;
+
+  const tdee = bmr * activity;
+
+  const protein = (tdee * 0.3)/4;
+  const fat = (tdee * 0.25)/9;
+  const carbs = (tdee * 0.45)/4;
+
+  document.getElementById("result").innerHTML =
+    `Калории: ${Math.round(tdee)}<br>
+     Белки: ${Math.round(protein)} г<br>
+     Жиры: ${Math.round(fat)} г<br>
+     Углеводы: ${Math.round(carbs)} г`;
+}
+
+window.saveLog = async function() {
+  const weight = +document.getElementById("d_weight").value;
+  const calories = +document.getElementById("d_calories").value;
+
+  await addDoc(collection(db,"logs"),{
+    weight,
+    calories,
+    date:new Date()
+  });
+
+  alert("Сохранено!");
+  loadCharts();
+}
+
+async function loadCharts(){
+  const querySnapshot = await getDocs(collection(db,"logs"));
+  const labels=[],weights=[],calories=[];
+
+  querySnapshot.forEach(doc=>{
+    const d=doc.data();
+    labels.push(new Date(d.date.seconds*1000).toLocaleDateString());
+    weights.push(d.weight);
+    calories.push(d.calories);
+  });
+
+  new Chart(document.getElementById("weightChart"),{
+    type:"line",
+    data:{labels,datasets:[{label:"Вес",data:weights}]}
+  });
+
+  new Chart(document.getElementById("calorieChart"),{
+    type:"bar",
+    data:{labels,datasets:[{label:"Калории",data:calories}]}
+  });
+}
+
+window.onload=loadCharts;
+</script>
+</head>
+
+<body>
+
+<header>Fitness Assistant 2.0</header>
+
+<div class="tabs">
+  <button onclick="showTab('profile')">Профиль</button>
+  <button onclick="showTab('diary')">Дневник</button>
+  <button onclick="showTab('progress')">Прогресс</button>
+</div>
+
+<div id="profile" class="section active">
+  <div class="card">
+    <h3>Расчёт КБЖУ</h3>
+    <input id="p_weight" type="number" placeholder="Вес (кг)">
+    <input id="p_height" type="number" placeholder="Рост (см)">
+    <input id="p_age" type="number" placeholder="Возраст">
+    <select id="p_gender">
+      <option value="male">Мужчина</option>
+      <option value="female">Женщина</option>
+    </select>
+    <select id="p_activity">
+      <option value="1.2">Низкая активность</option>
+      <option value="1.55">Средняя активность</option>
+      <option value="1.9">Высокая активность</option>
+    </select>
+    <button class="primary" onclick="calculate()">Рассчитать</button>
+    <div id="result"></div>
+  </div>
+</div>
+
+<div id="diary" class="section">
+  <div class="card">
+    <h3>Добавить запись</h3>
+    <input id="d_weight" type="number" placeholder="Вес сегодня">
+    <input id="d_calories" type="number" placeholder="Съедено калорий">
+    <button class="primary" onclick="saveLog()">Сохранить</button>
+  </div>
+</div>
+
+<div id="progress" class="section">
+  <div class="card">
+    <canvas id="weightChart"></canvas>
+  </div>
+  <div class="card">
+    <canvas id="calorieChart"></canvas>
+  </div>
+</div>
+
+</body>
+</html>
